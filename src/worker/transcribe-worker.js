@@ -1,28 +1,31 @@
 // Web Worker: corre el modelo Whisper (WASM/ONNX) fuera del hilo principal,
 // para que la escritura en el buscador y el scroll del chat nunca se congelen.
-// El modelo se carga una sola vez y se reutiliza para todas las notas de voz.
+// Cada modelo se carga una sola vez (por sesión de la pestaña) y se reutiliza.
 
 import { pipeline } from "@xenova/transformers";
 import "../lib/env-config.js";
-import { MODEL_ID } from "../lib/env-config.js";
+import { DEFAULT_MODEL_ID } from "../lib/constants.js";
 
-let transcriberPromise = null;
+const transcribers = new Map(); // modelId -> Promise<pipeline>
 
-function getTranscriber() {
-  if (!transcriberPromise) {
-    transcriberPromise = pipeline("automatic-speech-recognition", MODEL_ID, {
-      progress_callback: (p) => postMessage({ type: "model-progress", progress: p }),
-    });
+function getTranscriber(modelId) {
+  if (!transcribers.has(modelId)) {
+    transcribers.set(
+      modelId,
+      pipeline("automatic-speech-recognition", modelId, {
+        progress_callback: (p) => postMessage({ type: "model-progress", modelId, progress: p }),
+      })
+    );
   }
-  return transcriberPromise;
+  return transcribers.get(modelId);
 }
 
 self.onmessage = async (event) => {
-  const { type, jobId, audio, language } = event.data;
+  const { type, jobId, audio, language, modelId } = event.data;
   if (type !== "transcribe") return;
 
   try {
-    const transcriber = await getTranscriber();
+    const transcriber = await getTranscriber(modelId || DEFAULT_MODEL_ID);
     const result = await transcriber(audio, {
       // Fijo en 'transcribe': jamás 'translate'. Así el texto queda en el idioma
       // original del audio, sin pasar por ningún traductor automático.

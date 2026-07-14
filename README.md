@@ -53,14 +53,20 @@ poder escribir "reunión del viernes" y encontrar la nota de voz donde alguien d
 frase.
 
 - **Motor**: [`@xenova/transformers`](https://github.com/xenova/transformers.js) corriendo
-  **Whisper-tiny** (OpenAI Whisper, puerto a ONNX) enteramente en WASM, dentro de un
-  Web Worker del navegador. Es el mismo modelo (arquitectura Whisper) que ya usa el bot de
-  Telegram de este repo (`bot.py`, ver `openai-whisper` en `requirements.txt`), aquí
-  adaptado a un entorno donde no hay backend: todo corre client-side.
+  **Whisper** (OpenAI Whisper, puerto a ONNX) enteramente en WASM, dentro de un Web Worker
+  del navegador. Es la misma arquitectura que ya usa el bot de Telegram de este repo
+  (`bot.py` de `attendance-bot`, ver `openai-whisper` en su `requirements.txt`), aquí
+  adaptada a un entorno sin backend: todo corre client-side. Por defecto se usa
+  **whisper-tiny** (rápido, ~40 MB); desde el popup de la extensión se puede elegir
+  **base** o **small** si antes se descargaron (ver sección 7).
 - **Nunca traducción**: la tarea se fija explícitamente en `task: "transcribe"` en
   `src/worker/transcribe-worker.js` — jamás `"translate"`. El texto queda siempre en el
-  idioma original del audio. El idioma se autodetecta salvo que el usuario lo fije
-  manualmente en Opciones (para audios muy cortos, fijar el idioma mejora la precisión).
+  idioma original del audio, pase lo que pase.
+- **Idioma fijado en español por defecto**: como el uso esperado es mayormente audios en
+  español, el idioma viene fijo en `"es"` (se salta el paso de autodetección de Whisper:
+  más rápido y más preciso en notas de voz cortas, que es la mayoría). Se puede cambiar a
+  automático o a otro idioma desde Opciones — igual sigue siendo siempre "transcribir", no
+  "traducir".
 - **Metadatos igual se guardan** (remitente, chat, timestamp) para poder mostrar contexto
   y agrupar resultados, pero no reemplazan la transcripción — la complementan.
 
@@ -96,6 +102,20 @@ perezosa y en segundo plano:
 
 En otras palabras: el costo de la IA (que es lo lento) está totalmente desacoplado del
 costo de la búsqueda (que es lo que tiene que ser rápido).
+
+Por defecto la búsqueda es **global** (todos los chats, igual que WhatsApp cuando no hay
+un chat en foco). El panel de resultados tiene un toggle **"solo este chat"** para acotarla
+al chat que tenés abierto.
+
+### Resiliencia al cambiar de chat
+
+WhatsApp Web es una SPA: al abrir otra conversación puede reemplazar por completo el
+contenedor del chat (`#main`) en vez de solo vaciar su contenido. Si eso pasara, el
+`MutationObserver` que vigila las notas de voz quedaría mirando un nodo ya desconectado del
+DOM. Para blindarlo, `AudioCapture` (`src/content/audio-capture.js`) hace un chequeo liviano
+cada 3 segundos (`setInterval`, solo compara una referencia de nodo) y re-adjunta el
+observer si `#main` cambió — sin esto, la detección de audios nuevos podría dejar de
+funcionar silenciosamente después de navegar entre chats.
 
 ---
 
@@ -139,7 +159,7 @@ costo de la búsqueda (que es lo que tiene que ser rápido).
 │       └── background.js      # Valores por defecto al instalar
 ├── popup/                     # Toggle on/off, estadísticas, borrar índice
 ├── options/                   # Idioma, chats excluidos
-├── models/                    # (generado) pesos de Whisper-tiny, offline
+├── models/                    # (generado) pesos de Whisper descargados + manifest.json
 └── dist/                      # (generado) JS empaquetado, listo para cargar
 ```
 
@@ -171,13 +191,27 @@ A partir de acá:
   vas a ver un panel **"🎙️ Coincidencias en notas de voz"** con las notas donde aparece
   ese texto. Click en un resultado para saltar directo al mensaje en el chat.
 - Click en el ícono de la extensión (popup) para ver cuántas notas están indexadas,
-  desactivarla, o borrar el índice local.
+  desactivarla, elegir el modelo, o borrar el índice local.
 
-### Actualizar el modelo o reconstruir tras un cambio de código
+### Elegir un modelo más preciso (base / small)
+
+Por defecto solo se descarga **tiny**. Para tener **base** o **small** disponibles como
+opción en el popup:
 
 ```bash
-npm run build          # solo recompila JS
-npm run download-model # solo si querés forzar una redescarga del modelo
+npm run download-model -- --models=tiny,base,small
+npm run build
+```
+
+El popup solo muestra, en el selector, los modelos que efectivamente estén en `models/`
+(lee `models/manifest.json`) — así nunca ofrece una opción que fallaría por no estar
+descargada. Cambiar el modelo desde el popup pide recargar la pestaña de WhatsApp Web para
+aplicarse (el Worker ya está corriendo con el modelo anterior).
+
+### Reconstruir tras un cambio de código
+
+```bash
+npm run build   # recompila JS; no vuelve a descargar el modelo si ya está en models/
 ```
 
 Después de `npm run build`, recargar la extensión desde `chrome://extensions` (botón de
@@ -195,10 +229,15 @@ recarga) y refrescar la pestaña de WhatsApp Web.
 - Los selectores del DOM (`src/lib/dom-utils.js`) dependen de la estructura HTML actual
   de WhatsApp Web (en particular el atributo `data-pre-plain-text`, usado desde hace años
   por herramientas de exportación de chats). Si WhatsApp cambia su markup, puede requerir
-  un ajuste puntual en ese archivo — el resto del plugin no se ve afectado.
+  un ajuste puntual en ese archivo — el resto del plugin no se ve afectado. No se probó
+  contra una sesión real de WhatsApp Web durante el desarrollo; si algo no detecta audios
+  o no engancha el buscador, lo primero a revisar es si esos selectores siguen vigentes.
+- `chatId` se deriva del nombre visible del chat (no hay un ID estable expuesto en el DOM
+  sin engancharse al Store interno de WhatsApp, mucho más frágil entre versiones). Dos
+  chats con el mismo nombre comparten `chatId`: no afecta la búsqueda (cada nota de voz
+  tiene su propio `messageId` único), pero sí puede mezclar el toggle "solo este chat" o la
+  exclusión de chats entre ellos.
 - El índice vive en el navegador/perfil donde se instaló la extensión; no se sincroniza
   entre dispositivos.
-- Whisper-tiny prioriza velocidad sobre precisión. Para mejor calidad de transcripción
-  (a costa de más tiempo de procesamiento y más MB de modelo), cambiar `MODEL_ID` en
-  `src/lib/env-config.js` a `Xenova/whisper-base` o `Xenova/whisper-small` y volver a
-  correr `npm run setup`.
+- El modelo por defecto (whisper-tiny) prioriza velocidad sobre precisión. Se puede elegir
+  base o small desde el popup una vez descargados (ver sección 7).

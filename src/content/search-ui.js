@@ -15,6 +15,8 @@ export class SearchUI {
     this.debounceTimer = null;
     this.currentInput = null;
     this.mo = null;
+    this.scopeToChat = false;
+    this.lastQuery = "";
   }
 
   start() {
@@ -40,6 +42,7 @@ export class SearchUI {
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       const query = input.textContent?.trim() || "";
+      this.lastQuery = query;
       if (query.length < 2) return this._removePanel();
       this._renderResults(query);
     }, DEBOUNCE_MS);
@@ -51,18 +54,32 @@ export class SearchUI {
   }
 
   _renderResults(query) {
-    // Búsqueda global (no solo el chat abierto): igual que la búsqueda nativa de WhatsApp,
-    // que también busca en todos los chats cuando no hay uno abierto en foco de mensajes.
-    const results = this.index.search(query, { limit: 15 });
-    if (results.length === 0) return this._removePanel();
+    const openChatId = getOpenChatId();
+    const scopeOptions = this.scopeToChat ? { chatId: openChatId, limit: 15 } : { limit: 15 };
+    const results = this.index.search(query, scopeOptions);
+
+    // El toggle se muestra igual aunque no haya resultados en el chat actual,
+    // para que el usuario pueda desactivarlo y ver si hay coincidencias en otros chats.
+    if (results.length === 0 && !this.scopeToChat) return this._removePanel();
 
     const panel = this._ensurePanel();
     panel.innerHTML = `
-      <div class="wa-as-header">🎙️ Coincidencias en notas de voz (${results.length})</div>
+      <div class="wa-as-header">
+        <span>🎙️ Coincidencias en notas de voz (${results.length})</span>
+        <label class="wa-as-scope">
+          <input type="checkbox" id="wa-as-scope-toggle" ${this.scopeToChat ? "checked" : ""} />
+          solo este chat
+        </label>
+      </div>
       <div class="wa-as-list">
-        ${results.map((r) => this._resultRow(r, query)).join("")}
+        ${results.map((r) => this._resultRow(r, query)).join("") || '<div class="wa-as-empty">Sin coincidencias en este chat</div>'}
       </div>
     `;
+
+    panel.querySelector("#wa-as-scope-toggle").addEventListener("change", (e) => {
+      this.scopeToChat = e.target.checked;
+      this._renderResults(this.lastQuery);
+    });
 
     panel.querySelectorAll("[data-message-id]").forEach((row) => {
       row.addEventListener("click", () => {

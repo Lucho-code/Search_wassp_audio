@@ -17,14 +17,15 @@
     <label>
       Idioma de transcripción
       <select id="language">
-        <option value="">Automático (recomendado)</option>
-        <option value="es">Español</option>
+        <option value="es">Español (recomendado)</option>
+        <option value="">Automático (chats en varios idiomas)</option>
         <option value="en">Inglés</option>
         <option value="pt">Portugués</option>
       </select>
       <div class="hint">
-        Fija el idioma solo para acelerar la detección. La tarea siempre es
-        "transcribir", nunca "traducir": el texto queda en el idioma original del audio.
+        Fijar el idioma evita el paso de autodetección de Whisper: más rápido y
+        preciso en notas de voz cortas. La tarea siempre es "transcribir", nunca
+        "traducir" — el texto queda en el idioma original del audio pase lo que pase.
       </div>
     </label>
 

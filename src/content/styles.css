@@ -12,6 +12,26 @@
   padding: 8px 16px;
   font-weight: 600;
   opacity: 0.7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+#wa-audio-search-panel .wa-as-scope {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#wa-audio-search-panel .wa-as-empty {
+  padding: 12px 16px;
+  opacity: 0.6;
+  font-style: italic;
 }
 
 #wa-audio-search-panel .wa-as-row {

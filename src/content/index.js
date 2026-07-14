@@ -1,6 +1,7 @@
 import { TranscriptIndex } from "../lib/db.js";
 import { AudioCapture } from "./audio-capture.js";
 import { SearchUI } from "./search-ui.js";
+import { DEFAULT_MODEL_ID } from "../lib/constants.js";
 import panelCss from "./styles.css";
 
 async function main() {
@@ -58,7 +59,13 @@ class TranscriptionQueue {
       const jobId = this.nextId++;
       this.jobsById.set(jobId, job);
       this.worker.postMessage(
-        { type: "transcribe", jobId, audio: job.audio, language: this.settings.language || undefined },
+        {
+          type: "transcribe",
+          jobId,
+          audio: job.audio,
+          language: this.settings.language || undefined,
+          modelId: this.settings.model || DEFAULT_MODEL_ID,
+        },
         [job.audio.buffer]
       );
     };
@@ -96,11 +103,16 @@ function injectStyles() {
 }
 
 async function getSettings() {
-  const stored = await chrome.storage.local.get(["enabled", "excludedChats", "language"]);
+  const stored = await chrome.storage.local.get(["enabled", "excludedChats", "language", "model"]);
   return {
     enabled: stored.enabled ?? true,
     excludedChats: stored.excludedChats ?? [],
-    language: stored.language ?? null,
+    // "es" por defecto: el uso esperado es mayormente audios en español: fijar
+    // el idioma evita el paso de autodetección de Whisper, más rápido y preciso
+    // en notas de voz cortas. Igual sigue sin ser NUNCA una traducción (task
+    // fijo en "transcribe" en el worker) — el usuario puede cambiarlo en Opciones.
+    language: stored.language ?? "es",
+    model: stored.model ?? DEFAULT_MODEL_ID,
   };
 }
 
