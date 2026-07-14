@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Búsqueda en audios — Configuración</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; color: #1f2937; }
+      label { display: block; margin-bottom: 14px; font-size: 14px; }
+      input, select { margin-top: 4px; width: 100%; padding: 6px; box-sizing: border-box; }
+      .hint { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+      button { padding: 8px 16px; background: #00a884; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>Configuración</h1>
+
+    <label>
+      Idioma de transcripción
+      <select id="language">
+        <option value="">Automático (recomendado)</option>
+        <option value="es">Español</option>
+        <option value="en">Inglés</option>
+        <option value="pt">Portugués</option>
+      </select>
+      <div class="hint">
+        Fija el idioma solo para acelerar la detección. La tarea siempre es
+        "transcribir", nunca "traducir": el texto queda en el idioma original del audio.
+      </div>
+    </label>
+
+    <label>
+      Chats excluidos (uno por línea, nombre exacto tal como aparece en WhatsApp)
+      <textarea id="excludedChats" rows="4"></textarea>
+    </label>
+
+    <button id="save">Guardar</button>
+    <span id="status"></span>
+
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

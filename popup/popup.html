@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>Búsqueda en audios</h1>
+
+    <label class="row">
+      <span>Activo en WhatsApp Web</span>
+      <input type="checkbox" id="enabled" />
+    </label>
+
+    <div class="stat" id="stat">Notas de voz indexadas: —</div>
+
+    <button id="reindex">Reindexar chat abierto</button>
+    <button id="clear" class="danger">Borrar índice local</button>
+
+    <p class="hint">
+      El audio nunca sale de tu navegador. Solo se procesan notas de voz que ya
+      reprodujiste al menos una vez en esta sesión.
+    </p>
+
+    <a href="../options/options.html" target="_blank">Configuración avanzada</a>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
