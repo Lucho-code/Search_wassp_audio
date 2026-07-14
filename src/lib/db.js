@@ -20,8 +20,10 @@ function openDb() {
   });
 }
 
-/** Normaliza texto en español para búsqueda: minúsculas, sin tildes. */
-function normalize(text) {
+/** Normaliza texto en español para búsqueda: minúsculas, sin tildes.
+ *  Exportada porque search-ui.js la necesita para resaltar coincidencias
+ *  que solo matchean después de normalizar (ver highlight() ahí). */
+export function normalize(text) {
   return text
     .toLowerCase()
     .normalize("NFD")

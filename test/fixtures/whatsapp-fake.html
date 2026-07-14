@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  DOM mínimo que imita la estructura real de WhatsApp Web en los puntos que
+  el plugin realmente toca: #main/header con el nombre del chat, burbujas de
+  mensaje con data-id + data-pre-plain-text, elementos <audio>, y la caja de
+  búsqueda contenteditable. No es un clon completo de WhatsApp Web — es lo
+  mínimo necesario para ejercitar AudioCapture, SearchUI, TranscriptIndex y
+  dom-utils.js contra un DOM real (no simulado a mano).
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="side">
+        <div contenteditable="true" aria-label="Search input textbox" role="textbox"></div>
+      </div>
+      <div id="main">
+        <header><span title="Juan Pérez">Juan Pérez</span></header>
+        <div id="messages">
+          <div data-id="msg1" class="message-in">
+            <div class="copyable-text" data-pre-plain-text="[10:32, 14/7/2026] Juan Pérez: "></div>
+            <audio id="audio1"></audio>
+          </div>
+          <div data-id="msg2" class="message-out">
+            <div class="copyable-text" data-pre-plain-text="[10:35, 14/7/2026] Yo: "></div>
+            <audio id="audio2"></audio>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="harness.mjs"></script>
+  </body>
+</html>

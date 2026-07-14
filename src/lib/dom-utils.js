@@ -45,12 +45,20 @@ export function findSearchInput() {
   );
 }
 
+/**
+ * Devuelve true si encontró el mensaje y pudo hacer scroll. Devuelve false
+ * si el mensaje no está en el DOM actual — típicamente porque pertenece a
+ * un chat distinto del que está abierto (la búsqueda es global, pero no hay
+ * forma de navegar a otro chat automáticamente). El llamador debe avisarle
+ * al usuario en ese caso en vez de asumir que funcionó.
+ */
 export function scrollToMessage(messageId) {
   const el = document.querySelector(`[data-id="${CSS.escape(messageId)}"]`);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.style.transition = 'background-color 0.3s';
-    el.style.backgroundColor = 'rgba(0, 168, 132, 0.25)';
-    setTimeout(() => (el.style.backgroundColor = ''), 1200);
-  }
+  if (!el) return false;
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.transition = 'background-color 0.3s';
+  el.style.backgroundColor = 'rgba(0, 168, 132, 0.25)';
+  setTimeout(() => (el.style.backgroundColor = ''), 1200);
+  return true;
 }

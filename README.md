@@ -219,7 +219,36 @@ recarga) y refrescar la pestaña de WhatsApp Web.
 
 ---
 
-## 8. Limitaciones conocidas
+## 8. Tests
+
+```bash
+npm test
+```
+
+Corre `test/run.mjs`: levanta un Chromium real (vía Playwright) contra
+`test/fixtures/whatsapp-fake.html`, un DOM que imita los puntos concretos de WhatsApp Web
+que el plugin toca (`#main`/`header`, burbujas con `data-id` + `data-pre-plain-text`,
+`<audio>`, buscador `contenteditable`). Sobre ese DOM corren las clases **reales**
+(`AudioCapture`, `SearchUI`, `TranscriptIndex`, `dom-utils`) — no hay mocks de DOM,
+`IndexedDB`, `MutationObserver` ni `AudioContext`: son los del navegador. Se genera un WAV
+válido en memoria para que `fetch()` + `decodeAudioData()` corran sobre audio real, no un
+`src` inventado.
+
+Cubre: extracción de metadatos desde el DOM, deduplicación, resiliencia cuando WhatsApp
+reemplaza `#main` al cambiar de chat, tokenización/normalización de tildes, XSS en
+transcripciones (un transcript con `<img onerror=...>` no debe ejecutarse), resaltado de
+coincidencias, el toggle "solo este chat", y el click en resultados (tanto el caso feliz
+como cuando el mensaje no está en el chat abierto).
+
+**Lo que no prueba**: la transcripción real con Whisper. Eso requiere el modelo descargado
+(`npm run download-model`, con internet) corriendo dentro de un Worker; el test reemplaza
+ese paso por un stub que simula un resultado exitoso, para poder validar todo el resto del
+pipeline rápido y sin red. Tampoco se probó contra una sesión real de `web.whatsapp.com`
+(ver limitaciones abajo sobre los selectores del DOM).
+
+---
+
+## 9. Limitaciones conocidas
 
 - **Solo se indexan notas de voz ya reproducidas** en la sesión del navegador. Es una
   decisión deliberada: auto-reproducir audios para indexarlos marcaría los mensajes como
@@ -237,6 +266,12 @@ recarga) y refrescar la pestaña de WhatsApp Web.
   chats con el mismo nombre comparten `chatId`: no afecta la búsqueda (cada nota de voz
   tiene su propio `messageId` único), pero sí puede mezclar el toggle "solo este chat" o la
   exclusión de chats entre ellos.
+- La búsqueda es global (todos los chats), pero clickear un resultado de un chat que **no**
+  es el que tenés abierto no navega ahí automáticamente — no hay una forma confiable de
+  simular ese click en la lista de chats de WhatsApp sin agregar más selectores frágiles.
+  En ese caso el panel se queda abierto y muestra un aviso ("Abrí ese chat para ver este
+  mensaje") en vez de fallar en silencio. Si el resultado es del chat ya abierto, el click
+  sí hace scroll directo al mensaje.
 - El índice vive en el navegador/perfil donde se instaló la extensión; no se sincroniza
   entre dispositivos.
 - El modelo por defecto (whisper-tiny) prioriza velocidad sobre precisión. Se puede elegir

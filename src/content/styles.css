@@ -34,6 +34,12 @@
   font-style: italic;
 }
 
+#wa-audio-search-panel .wa-as-row-notice {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #b45309;
+}
+
 #wa-audio-search-panel .wa-as-row {
   padding: 8px 16px;
   cursor: pointer;

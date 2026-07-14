@@ -5,6 +5,7 @@
 // de búsqueda de texto).
 
 import { findSearchInput, scrollToMessage, getOpenChatId } from "../lib/dom-utils.js";
+import { normalize } from "../lib/db.js";
 
 const PANEL_ID = "wa-audio-search-panel";
 const DEBOUNCE_MS = 180;
@@ -83,8 +84,15 @@ export class SearchUI {
 
     panel.querySelectorAll("[data-message-id]").forEach((row) => {
       row.addEventListener("click", () => {
-        scrollToMessage(row.getAttribute("data-message-id"));
-        this._removePanel();
+        const found = scrollToMessage(row.getAttribute("data-message-id"));
+        if (found) {
+          this._removePanel();
+        } else {
+          // El mensaje no está en el chat abierto actualmente (resultado de otro
+          // chat): no hay forma de navegar ahí automáticamente, así que avisamos
+          // en vez de cerrar el panel simulando que funcionó.
+          this._flashRowNotice(row, "Abrí ese chat para ver este mensaje");
+        }
       });
     });
   }
@@ -93,13 +101,25 @@ export class SearchUI {
     const safeName = escapeHtml(r.chatName || r.sender || "Chat");
     const safeSender = escapeHtml(r.sender || "");
     const safeTime = escapeHtml(r.timestampText || "");
-    const snippet = highlight(escapeHtml(r.snippet), query);
+    const snippet = highlight(r.snippet, query);
     return `
       <div class="wa-as-row" data-message-id="${escapeHtml(r.messageId)}">
         <div class="wa-as-row-title">${safeName} ${safeSender ? "· " + safeSender : ""} ${safeTime ? "· " + safeTime : ""}</div>
         <div class="wa-as-row-snippet">${snippet}</div>
       </div>
     `;
+  }
+
+  _flashRowNotice(row, text) {
+    let notice = row.querySelector(".wa-as-row-notice");
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.className = "wa-as-row-notice";
+      row.appendChild(notice);
+    }
+    notice.textContent = text;
+    clearTimeout(notice._hideTimer);
+    notice._hideTimer = setTimeout(() => notice.remove(), 2500);
   }
 
   _ensurePanel() {
@@ -122,12 +142,50 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function highlight(escapedSnippet, query) {
-  const terms = query.trim().split(/\s+/).filter(Boolean).map(escapeHtml);
-  let out = escapedSnippet;
+/**
+ * Resalta las coincidencias en `<mark>`, buscando sobre una versión
+ * normalizada (sin tildes, minúsculas) del snippet — la misma normalización
+ * que usa TranscriptIndex.search — pero mostrando siempre el texto original
+ * (con sus tildes) y correctamente escapado. Sin esto, buscar "reunion" no
+ * resaltaba nada en un snippet con "reunión", aunque sí aparecía como
+ * resultado (la búsqueda en sí ya era insensible a tildes; el resaltado no).
+ */
+function highlight(rawSnippet, query) {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => normalize(t));
+  if (terms.length === 0) return escapeHtml(rawSnippet);
+
+  const normalizedSnippet = normalize(rawSnippet);
+  const spans = [];
   for (const term of terms) {
-    const re = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig");
-    out = out.replace(re, "<mark>$1</mark>");
+    if (!term) continue;
+    let from = 0;
+    let idx;
+    while ((idx = normalizedSnippet.indexOf(term, from)) !== -1) {
+      spans.push([idx, idx + term.length]);
+      from = idx + term.length;
+    }
   }
+  if (spans.length === 0) return escapeHtml(rawSnippet);
+
+  spans.sort((a, b) => a[0] - b[0]);
+  const merged = [spans[0]];
+  for (const [s, e] of spans.slice(1)) {
+    const last = merged[merged.length - 1];
+    if (s <= last[1]) last[1] = Math.max(last[1], e);
+    else merged.push([s, e]);
+  }
+
+  let out = "";
+  let cursor = 0;
+  for (const [s, e] of merged) {
+    out += escapeHtml(rawSnippet.slice(cursor, s));
+    out += "<mark>" + escapeHtml(rawSnippet.slice(s, e)) + "</mark>";
+    cursor = e;
+  }
+  out += escapeHtml(rawSnippet.slice(cursor));
   return out;
 }
